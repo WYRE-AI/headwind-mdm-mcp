@@ -7,8 +7,12 @@ import type { EndpointSpec, ParamSpec } from "./utils/types.js";
  *
  * Paths are relative to `<HMDM_BASE_URL>/rest`. Request shapes were taken from
  * the upstream Java resource classes (server rest/resource and the plugins rest packages).
- * Tenant fields (`customerId`, `userId`) are never accepted: the server derives
- * them from the authenticated user.
+ * Tenant fields (`customerId`, `userId`) are not declared as top-level arguments,
+ * so undeclared top-level arguments (including these) are dropped. Entity objects
+ * (request bodies) are passed through with any extra fields, minus `__proto__` /
+ * `constructor` / `prototype`, so a tenant field inside an entity object is NOT
+ * stripped by this server; the Headwind server derives tenancy from the
+ * authenticated user and must be relied on to ignore or reject it.
  */
 
 const optional = (spec: ParamSpec): ParamSpec => ({ ...spec, optional: true });

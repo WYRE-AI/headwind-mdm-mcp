@@ -28,6 +28,9 @@ const KNOWN_PLACEHOLDER_SECRETS = new Set([
 /** Pattern placeholders such as "xxxxxxxx..." or "your-secret-here". */
 const PLACEHOLDER_PATTERN = /^(x+|0+|your[-_ ]?(s2s[-_ ])?secret.*|change[-_ ]?me.*|replace[-_ ]?(with|me).*)$/i;
 
+/** A secret made of a single repeated character ("aaaa...", "1111...", "----..."), case-insensitive. */
+const REPEATED_CHAR_PATTERN = /^(.)\1*$/is;
+
 const LOOPBACK_HOST = "127.0.0.1";
 const MISSING_S2S_SECRET_ERROR =
   "Refusing to start HTTP transport: CONDUIT_S2S_SECRET is empty. " +
@@ -60,6 +63,10 @@ export function isLoopbackBindHost(host: string): boolean {
   return parts[0] === "127";
 }
 
+function isRepeatedChar(value: string): boolean {
+  return REPEATED_CHAR_PATTERN.test(value.toLowerCase());
+}
+
 /**
  * Fail closed. A placeholder or short value is never a configured secret,
  * including when MCP_ALLOW_INSECURE_DEV=1 is also set. Empty is the only case
@@ -68,7 +75,7 @@ export function isLoopbackBindHost(host: string): boolean {
  */
 export function resolveS2sSecret(env: NodeJS.ProcessEnv = process.env): { secret: string; insecureDev: boolean } {
   const raw = (env.CONDUIT_S2S_SECRET ?? "").trim();
-  if (raw && (KNOWN_PLACEHOLDER_SECRETS.has(raw.toLowerCase()) || PLACEHOLDER_PATTERN.test(raw))) {
+  if (raw && (KNOWN_PLACEHOLDER_SECRETS.has(raw.toLowerCase()) || PLACEHOLDER_PATTERN.test(raw) || isRepeatedChar(raw))) {
     refuseStart(PLACEHOLDER_S2S_SECRET_ERROR);
   }
   if (raw && raw.length < 32) {

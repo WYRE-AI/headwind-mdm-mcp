@@ -38,6 +38,7 @@ describe("resolveS2sSecret", () => {
     const cases = [
       "short-secret-value", "changeme", "Change-Me", "secret", "placeholder", "replace-with-a-real-secret",
       "x".repeat(40), "X".repeat(40), "0".repeat(40),
+      "a".repeat(40), "Z".repeat(64), "1".repeat(40), "-".repeat(40), "aAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaA",
       "your-secret-goes-here-please-replace", "your_s2s_secret_goes_here_please_replace", "CHANGEME-" + "a".repeat(30),
       "replace-with-your-own-generated-secret", "replace_me_" + "a".repeat(30),
     ];
@@ -48,9 +49,16 @@ describe("resolveS2sSecret", () => {
     }
     err.mockRestore();
   });
+  it("accepts a real random hex secret", () => {
+    const hex = "9f2c4be07a1d83e5c6b0d4f1a2837e95b6c0d1e2f3a4b5c69788796a5b4c3d2e";
+    expect(resolveS2sSecret({ CONDUIT_S2S_SECRET: hex }).secret).toBe(hex);
+  });
   it("rejects a 31-character secret and accepts exactly 32", () => {
     expect(withExit(() => resolveS2sSecret({ CONDUIT_S2S_SECRET: "k".repeat(31) }))).toBe("exit:1");
-    expect(resolveS2sSecret({ CONDUIT_S2S_SECRET: "k".repeat(32) }).secret).toBe("k".repeat(32));
+    const exact = "k7Qp".repeat(8);
+    expect(exact).toHaveLength(32);
+    expect(resolveS2sSecret({ CONDUIT_S2S_SECRET: exact }).secret).toBe(exact);
+    expect(withExit(() => resolveS2sSecret({ CONDUIT_S2S_SECRET: "k".repeat(32) }))).toBe("exit:1");
   });
   it("rejects a short secret even with MCP_ALLOW_INSECURE_DEV=1; empty+dev is allowed", () => {
     expect(withExit(() => resolveS2sSecret({ CONDUIT_S2S_SECRET: "tiny", MCP_ALLOW_INSECURE_DEV: "1" }))).toBe("exit:1");

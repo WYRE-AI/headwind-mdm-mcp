@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.asachs01/headwind-mdm-mcp",
+  "name": "io.github.WYRE-AI/headwind-mdm-mcp",
   "title": "Headwind MDM",
   "description": "MCP server for the Headwind MDM REST API.",
   "repository": {

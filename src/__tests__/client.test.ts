@@ -129,7 +129,7 @@ describe("login and token cache", () => {
     expect(mock).toHaveBeenCalledTimes(4);
   });
 
-  it("keys the cache by SHA-256 digests, never plaintext secrets", async () => {
+  it("keys the cache by HMAC-SHA256 digests, never plaintext secrets", async () => {
     stubFetch(() => loginOk("tok-one"));
     await getAccessToken(credentials);
     const keys = tokenCacheKeys();
@@ -140,6 +140,49 @@ describe("login and token cache", () => {
       expect(key).not.toContain(credentials.username);
       expect(key).not.toContain(md5Upper(credentials.password));
     }
+  });
+
+  it("uses keys that differ per credential and are not plain SHA-256", async () => {
+    stubFetch(() => loginOk("tok-one"));
+    const other = { username: "test-admin", password: "fake-other-password" };
+    await getAccessToken(credentials);
+    await getAccessToken(other);
+    const keys = tokenCacheKeys();
+    expect(new Set(keys).size).toBe(2);
+    for (const key of keys) expect(key).toMatch(/^[0-9a-f]{64}$/);
+    const plain = createHash("sha256").update(JSON.stringify([`${BASE}/rest`, credentials.username, credentials.password])).digest("hex");
+    expect(keys).not.toContain(plain);
+  });
+
+  it("shares one in-flight login between concurrent callers", async () => {
+    const mock = stubFetch(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return loginOk("tok-shared");
+    });
+    const tokens = await Promise.all(Array.from({ length: 5 }, () => getAccessToken(credentials)));
+    expect(tokens).toEqual(Array(5).fill("tok-shared"));
+    expect(mock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cache a failed login and retries on the next call", async () => {
+    let n = 0;
+    const mock = stubFetch(() => (++n === 1 ? json({ message: "bad credentials" }, 401) : loginOk("tok-ok")));
+    await expect(getAccessToken(credentials)).rejects.toThrow();
+    expect(await getAccessToken(credentials)).toBe("tok-ok");
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not make different credentials share or block each other's login", async () => {
+    const mock = stubFetch(async (_url, init) => {
+      const login = (JSON.parse(String(init.body)) as { login: string }).login;
+      return loginOk(`tok-${login}`);
+    });
+    const [a, b] = await Promise.all([
+      getAccessToken({ username: "u1", password: "fake-pass-1" }),
+      getAccessToken({ username: "u2", password: "fake-pass-2" }),
+    ]);
+    expect([a, b]).toEqual(["tok-u1", "tok-u2"]);
+    expect(mock).toHaveBeenCalledTimes(2);
   });
 
   it("is bounded (LRU) and sweeps expired entries", async () => {
@@ -158,6 +201,45 @@ describe("login and token cache", () => {
     vi.setSystemTime(Date.now() + TOKEN_TTL_MS + 1000);
     await getAccessToken({ username: "fresh", password: "fake-fresh-pass" });
     expect(tokenCacheSize()).toBe(1);
+  });
+});
+
+describe("response size cap", () => {
+  function streamed(chunks: number, chunkSize: number, onCancel?: () => void): Response {
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent++ >= chunks) return controller.close();
+        controller.enqueue(new Uint8Array(chunkSize).fill(97));
+      },
+      cancel() {
+        onCancel?.();
+      },
+    });
+    return new Response(body, { status: 200 });
+  }
+
+  it("aborts a streamed body once the cap is exceeded", async () => {
+    let cancelled = false;
+    stubFetch((url) => (url.endsWith("/login") ? loginOk("tok-one") : streamed(1000, 1_000_000, () => (cancelled = true))));
+    const result = await executeHeadwindRequest({ method: "GET", path: "/private/settings", credentials });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toMatch(/too large/);
+    expect(cancelled).toBe(true);
+  });
+
+  it("rejects early on an oversized Content-Length", async () => {
+    stubFetch((url) =>
+      url.endsWith("/login") ? loginOk("tok-one") : new Response("{}", { status: 200, headers: { "content-length": "99999999999" } }),
+    );
+    const result = await executeHeadwindRequest({ method: "GET", path: "/private/settings", credentials });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toMatch(/too large/);
+  });
+
+  it("applies the cap to the login response too", async () => {
+    stubFetch(() => streamed(1000, 1_000_000));
+    await expect(getAccessToken(credentials)).rejects.toThrow(/too large/);
   });
 });
 

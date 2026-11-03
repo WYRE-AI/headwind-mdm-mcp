@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type {
   BuiltRequest,
@@ -187,13 +187,16 @@ interface CachedToken {
 }
 
 // Tokens are cached per (baseUrl, username, password) so one gateway user can
-// never be served another user's token. Keys are SHA-256 digests (no plaintext
-// secret is ever a key). Map insertion order gives an LRU: a hit re-inserts the
+// never be served another user's token. Keys are HMAC-SHA256 digests under a
+// random per-process key (never logged or exported), so no plaintext secret is
+// ever a key and keys cannot be precomputed offline. Map insertion order gives an LRU: a hit re-inserts the
 // entry and the oldest entry is evicted past MAX_TOKEN_CACHE.
 const tokenCache = new Map<string, CachedToken>();
 
+const CACHE_KEY_SECRET = randomBytes(32);
+
 function cacheKey(baseUrl: string, credentials: HeadwindCredentials): string {
-  return createHash("sha256")
+  return createHmac("sha256", CACHE_KEY_SECRET)
     .update(JSON.stringify([baseUrl, credentials.username, credentials.password]))
     .digest("hex");
 }
@@ -235,7 +238,7 @@ export function tokenCacheSize(): number {
   return tokenCache.size;
 }
 
-/** Cache keys (SHA-256 hex digests only); exposed so tests can assert no plaintext secret is a key. */
+/** Cache keys (HMAC-SHA256 hex digests only); exposed so tests can assert no plaintext secret is a key. */
 export function tokenCacheKeys(): string[] {
   return [...tokenCache.keys()];
 }
@@ -275,6 +278,57 @@ async function fetchOnce(url: string, init: RequestInit, secrets: string[]): Pro
   }
 }
 
+/**
+ * Read a response body with a hard cap of MAX_RESPONSE_CHARS bytes. Rejects early
+ * on an oversized Content-Length and cancels the stream as soon as the cap is exceeded.
+ */
+async function readBodyLimited(response: Response): Promise<string> {
+  const tooLarge = (): HeadwindError => new HeadwindError("http", "Headwind MDM response is too large.");
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_RESPONSE_CHARS) {
+    await response.body?.cancel().catch(() => undefined);
+    throw tooLarge();
+  }
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_RESPONSE_CHARS) {
+        await reader.cancel().catch(() => undefined);
+        throw tooLarge();
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+  } catch (error) {
+    if (error instanceof HeadwindError) throw error;
+    const name = error instanceof Error ? error.name : "";
+    if (name === "TimeoutError" || name === "AbortError") {
+      throw new HeadwindError("timeout", "Headwind MDM request timed out after 30 seconds.");
+    }
+    throw new HeadwindError("network", "Reading the Headwind MDM response failed.");
+  }
+  return text + decoder.decode();
+}
+
+// Single-flight login: concurrent logins for the same cache key share one promise.
+const inflightLogins = new Map<string, Promise<string>>();
+
+function singleFlightLogin(key: string, baseUrl: string, credentials: HeadwindCredentials): Promise<string> {
+  const existing = inflightLogins.get(key);
+  if (existing) return existing;
+  const promise = login(baseUrl, credentials).finally(() => {
+    inflightLogins.delete(key);
+  });
+  inflightLogins.set(key, promise);
+  return promise;
+}
+
 /** POST the JWT login and cache the token. Never echoes the password or its MD5. */
 async function login(baseUrl: string, credentials: HeadwindCredentials): Promise<string> {
   const passwordMd5 = md5Uppercase(credentials.password);
@@ -291,7 +345,7 @@ async function login(baseUrl: string, credentials: HeadwindCredentials): Promise
   if (response.status >= 300 && response.status < 400) {
     throw new HeadwindError("http", `Headwind MDM returned an unexpected redirect (status ${response.status}); redirects are not followed.`);
   }
-  const body = safeJson(await response.text());
+  const body = safeJson(await readBodyLimited(response));
   const headerToken = response.ok ? extractBearerToken(response.headers.get("authorization")) : "";
   const bodyToken = response.ok && isRecord(body) && typeof body.id_token === "string" ? body.id_token : "";
   const token = headerToken || bodyToken;
@@ -305,7 +359,8 @@ async function login(baseUrl: string, credentials: HeadwindCredentials): Promise
 
 /** Returns a (cached or fresh) bearer token for the credentials. */
 export async function getAccessToken(credentials: HeadwindCredentials, baseUrl: string = getBaseUrl()): Promise<string> {
-  return cacheGet(cacheKey(baseUrl, credentials)) ?? (await login(baseUrl, credentials));
+  const key = cacheKey(baseUrl, credentials);
+  return cacheGet(key) ?? (await singleFlightLogin(key, baseUrl, credentials));
 }
 
 // ---------------------------------------------------------------------------
@@ -513,7 +568,7 @@ export async function executeHeadwindRequest(
     if (response.status === 401 && needsAuth) {
       // Exactly ONE re-authentication and ONE retry; no recursion.
       tokenCache.delete(key);
-      token = await login(baseUrl, credentials);
+      token = await singleFlightLogin(key, baseUrl, credentials);
       response = await send(token);
       if (response.status === 401) tokenCache.delete(key);
     }
@@ -529,9 +584,12 @@ export async function executeHeadwindRequest(
   if (response.status >= 300 && response.status < 400) {
     return failure("http", `Headwind MDM returned an unexpected redirect (status ${response.status}); redirects are not followed.`);
   }
-  const text = await response.text();
-  if (text.length > MAX_RESPONSE_CHARS) {
-    return failure("http", "Headwind MDM response is too large.");
+  let text: string;
+  try {
+    text = await readBodyLimited(response);
+  } catch (error) {
+    if (error instanceof HeadwindError) return failure(error.kind, error.message);
+    throw error;
   }
   const body = safeJson(text);
   if (response.status >= 300) {
