@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { spawn } from "node:child_process";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
@@ -60,7 +61,7 @@ await new Promise((resolvePromise, reject) => {
 const mockUrl = `http://127.0.0.1:${mock.address().port}`;
 console.log(`mock Headwind MDM REST endpoint on ${mockUrl}`);
 
-async function withServer(fn) {
+async function withServer(extraEnv, fn) {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [resolve(root, "dist/index.js")],
@@ -70,6 +71,7 @@ async function withServer(fn) {
       HMDM_USERNAME: "smoke-user",
       HMDM_PASSWORD: "smoke-password",
       LOG_LEVEL: "warn",
+      ...extraEnv,
     },
     stderr: "inherit",
   });
@@ -83,26 +85,59 @@ async function withServer(fn) {
   }
 }
 
+const textOf = (result) => result.content.map((content) => content.text ?? "").join("");
+
 async function main() {
   console.log("\n[1] default tiers (read only)");
-  await withServer(async (client) => {
+  await withServer({}, async (client) => {
     const { tools } = await client.listTools();
     console.log(`  tools listed: ${tools.length}`);
     check(tools.length === 32, "32 tools at default tiers");
     check(tools.every((tool) => tool.annotations?.readOnlyHint === true), "every listed tool is read-only");
+    check(tools.every((tool) => tool.inputSchema?.properties !== undefined), "every tool has an inputSchema with properties");
 
     const result = await client.callTool({
       name: "hmdm_devices_search",
-      arguments: { page: 1, size: 10 },
+      arguments: { pageNum: 1, pageSize: 10, bogus: "do-not-forward" },
     });
-    const text = result.content.map((content) => content.text ?? "").join("");
+    const text = textOf(result);
     console.log(`  hmdm_devices_search -> ${text}`);
     check(!result.isError, "device search succeeded");
     check(JSON.parse(text).devices.totalCount === 1, "device search returned mocked data");
 
     const loginCall = seen.find((entry) => entry.url === "/rest/public/jwt/login");
     check(loginCall !== undefined, "login endpoint was called");
+    check(loginCall !== undefined && !loginCall.body.includes("smoke-password"), "login sends the MD5, not the plain password");
+    const searchCall = seen.find((entry) => entry.url === "/rest/private/devices/search");
+    check(searchCall?.body === JSON.stringify({ pageNum: 1, pageSize: 10 }), "only declared arguments are forwarded");
   });
+
+  console.log("\n[2] all tiers");
+  await withServer({ HMDM_TOOL_TIERS: "read,write,admin" }, async (client) => {
+    const { tools } = await client.listTools();
+    check(tools.length === 61, "61 tools with all tiers");
+    check(new Set(tools.map((tool) => tool.name)).size === 61, "tool names are unique");
+    const bad = await client.callTool({ name: "hmdm_devices_delete", arguments: { id: "../1" } });
+    check(bad.isError === true, "path parameter with a separator is rejected");
+  });
+
+  console.log("\n[base-url] no default HMDM_BASE_URL");
+  await withServer({ HMDM_BASE_URL: "" }, async (client) => {
+    const { tools } = await client.listTools();
+    check(tools.length === 32, "stdio with HMDM_BASE_URL unset still lists tools");
+    const result = await client.callTool({ name: "hmdm_devices_search", arguments: {} });
+    check(result.isError === true && textOf(result).includes("HMDM_BASE_URL is required"), "tool calls return is_error mentioning HMDM_BASE_URL is required");
+  });
+  const httpExit = await new Promise((resolveExit) => {
+    const env = { ...process.env, MCP_TRANSPORT: "http", AUTH_MODE: "env", MCP_HTTP_PORT: "0", LOG_LEVEL: "warn" };
+    delete env.HMDM_BASE_URL;
+    const proc = spawn(process.execPath, [resolve(root, "dist/index.js")], { env, stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    proc.stderr.on("data", (chunk) => (stderr += chunk));
+    const timer = setTimeout(() => { proc.kill(); resolveExit({ code: "timeout", stderr }); }, 5000);
+    proc.on("exit", (code) => { clearTimeout(timer); resolveExit({ code, stderr }); });
+  });
+  check(httpExit.code === 1 && httpExit.stderr.includes("HMDM_BASE_URL is required"), "http mode with HMDM_BASE_URL unset exits 1 at startup");
 }
 
 try {

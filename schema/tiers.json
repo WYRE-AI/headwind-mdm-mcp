@@ -184,15 +184,15 @@
     "operation": "messagingSend"
   },
   "hmdm_push_send": {
-    "tier": "write",
+    "tier": "admin",
     "operation": "pushSend"
   },
   "hmdm_push_api_send": {
-    "tier": "write",
+    "tier": "admin",
     "operation": "pushApiSend"
   },
   "hmdm_push_task_update": {
-    "tier": "write",
+    "tier": "admin",
     "operation": "pushTaskUpdate"
   },
   "hmdm_devices_delete": {

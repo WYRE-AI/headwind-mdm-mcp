@@ -1,12 +1,12 @@
 # Multi-stage build for Headwind MDM MCP Server
-FROM node:26-alpine AS builder
+FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build
 
-FROM node:26-alpine AS production
+FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS production
 RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser
 WORKDIR /app
 COPY package*.json ./
@@ -20,7 +20,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 ENV NODE_ENV=production MCP_TRANSPORT=http MCP_HTTP_PORT=8080 MCP_HTTP_HOST=0.0.0.0 LOG_LEVEL=info AUTH_MODE=gateway
 CMD ["node", "dist/index.js"]
 
-LABEL maintainer="engineering@asachs01@users.noreply.github.com"
+LABEL maintainer="engineering@headwind-mdm-mcp"
 LABEL description="MCP server for the Headwind MDM REST API"
 LABEL org.opencontainers.image.title="headwind-mdm-mcp"
 LABEL org.opencontainers.image.description="Model Context Protocol server for Headwind MDM"

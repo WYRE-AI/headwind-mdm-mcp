@@ -12,14 +12,14 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/asachs01/headwind-mdm-mcp:0.0.0",
+      "identifier": "ghcr.io/wyre-ai/headwind-mdm-mcp:0.0.0",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
           "name": "HMDM_BASE_URL",
-          "description": "Headwind MDM REST base URL",
+          "description": "Headwind MDM server root, e.g. https://mdm.example.com (/rest is appended automatically). Required; no default.",
           "isRequired": true,
           "isSecret": false,
           "format": "string"

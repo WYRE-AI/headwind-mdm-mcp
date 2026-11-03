@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  packages: read  # required by the reusable mcp-assert workflow
+
 jobs:
   assert:
     uses: wyre-technology/.github/.github/workflows/mcp-assert.yml@7542c27000cf8d213c4910b4f397637b105a718b  # main
