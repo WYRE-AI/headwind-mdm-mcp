@@ -1,0 +1,246 @@
+{
+  "hmdm_devices_search": {
+    "tier": "read",
+    "operation": "devicesSearch"
+  },
+  "hmdm_devices_number_get": {
+    "tier": "read",
+    "operation": "devicesNumberGet"
+  },
+  "hmdm_devices_application_settings_get": {
+    "tier": "read",
+    "operation": "devicesApplicationSettingsGet"
+  },
+  "hmdm_configurations_search": {
+    "tier": "read",
+    "operation": "configurationsSearch"
+  },
+  "hmdm_configurations_list": {
+    "tier": "read",
+    "operation": "configurationsList"
+  },
+  "hmdm_configurations_search_value": {
+    "tier": "read",
+    "operation": "configurationsSearchByValue"
+  },
+  "hmdm_configurations_get": {
+    "tier": "read",
+    "operation": "configurationsGet"
+  },
+  "hmdm_configurations_applications_get": {
+    "tier": "read",
+    "operation": "configurationsApplicationsGet"
+  },
+  "hmdm_applications_search": {
+    "tier": "read",
+    "operation": "applicationsSearch"
+  },
+  "hmdm_applications_search_value": {
+    "tier": "read",
+    "operation": "applicationsSearchByValue"
+  },
+  "hmdm_applications_get": {
+    "tier": "read",
+    "operation": "applicationsGet"
+  },
+  "hmdm_applications_versions_get": {
+    "tier": "read",
+    "operation": "applicationsVersionsGet"
+  },
+  "hmdm_applications_configurations_get": {
+    "tier": "read",
+    "operation": "applicationsConfigurationsGet"
+  },
+  "hmdm_groups_search": {
+    "tier": "read",
+    "operation": "groupsSearch"
+  },
+  "hmdm_groups_search_value": {
+    "tier": "read",
+    "operation": "groupsSearchByValue"
+  },
+  "hmdm_summary_devices_get": {
+    "tier": "read",
+    "operation": "summaryDevicesGet"
+  },
+  "hmdm_users_current_get": {
+    "tier": "read",
+    "operation": "usersCurrentGet"
+  },
+  "hmdm_users_all_get": {
+    "tier": "read",
+    "operation": "usersAllGet"
+  },
+  "hmdm_users_roles_get": {
+    "tier": "read",
+    "operation": "usersRolesGet"
+  },
+  "hmdm_roles_all_get": {
+    "tier": "read",
+    "operation": "rolesAllGet"
+  },
+  "hmdm_roles_permissions_get": {
+    "tier": "read",
+    "operation": "rolesPermissionsGet"
+  },
+  "hmdm_settings_get": {
+    "tier": "read",
+    "operation": "settingsGet"
+  },
+  "hmdm_web_ui_files_search": {
+    "tier": "read",
+    "operation": "webUiFilesSearch"
+  },
+  "hmdm_web_ui_files_limit": {
+    "tier": "read",
+    "operation": "webUiFilesLimit"
+  },
+  "hmdm_plugins_active_get": {
+    "tier": "read",
+    "operation": "pluginsActiveGet"
+  },
+  "hmdm_update_check_get": {
+    "tier": "read",
+    "operation": "updateCheckGet"
+  },
+  "hmdm_audit_logs_search": {
+    "tier": "read",
+    "operation": "auditLogsSearch"
+  },
+  "hmdm_device_logs_search": {
+    "tier": "read",
+    "operation": "deviceLogsSearch"
+  },
+  "hmdm_deviceinfo_device_get": {
+    "tier": "read",
+    "operation": "deviceinfoDeviceGet"
+  },
+  "hmdm_messaging_search": {
+    "tier": "read",
+    "operation": "messagingSearch"
+  },
+  "hmdm_push_search": {
+    "tier": "read",
+    "operation": "pushSearch"
+  },
+  "hmdm_push_tasks_search": {
+    "tier": "read",
+    "operation": "pushTasksSearch"
+  },
+  "hmdm_devices_update": {
+    "tier": "write",
+    "operation": "devicesUpdate"
+  },
+  "hmdm_devices_description_create": {
+    "tier": "write",
+    "operation": "devicesDescriptionCreate"
+  },
+  "hmdm_devices_group_bulk": {
+    "tier": "write",
+    "operation": "devicesGroupBulk"
+  },
+  "hmdm_devices_application_settings": {
+    "tier": "write",
+    "operation": "devicesApplicationSettings"
+  },
+  "hmdm_devices_application_settings_notify": {
+    "tier": "write",
+    "operation": "devicesApplicationSettingsNotify"
+  },
+  "hmdm_configurations_update": {
+    "tier": "write",
+    "operation": "configurationsUpdate"
+  },
+  "hmdm_configurations_copy": {
+    "tier": "write",
+    "operation": "configurationsCopy"
+  },
+  "hmdm_configurations_upgrade": {
+    "tier": "write",
+    "operation": "configurationsUpgrade"
+  },
+  "hmdm_applications_android_update": {
+    "tier": "write",
+    "operation": "applicationsAndroidUpdate"
+  },
+  "hmdm_applications_web_update": {
+    "tier": "write",
+    "operation": "applicationsWebUpdate"
+  },
+  "hmdm_applications_versions_update": {
+    "tier": "write",
+    "operation": "applicationsVersionsUpdate"
+  },
+  "hmdm_applications_configurations_update": {
+    "tier": "write",
+    "operation": "applicationsConfigurationsUpdate"
+  },
+  "hmdm_groups_update": {
+    "tier": "write",
+    "operation": "groupsUpdate"
+  },
+  "hmdm_messaging_send": {
+    "tier": "write",
+    "operation": "messagingSend"
+  },
+  "hmdm_push_send": {
+    "tier": "admin",
+    "operation": "pushSend"
+  },
+  "hmdm_push_api_send": {
+    "tier": "admin",
+    "operation": "pushApiSend"
+  },
+  "hmdm_push_task_update": {
+    "tier": "admin",
+    "operation": "pushTaskUpdate"
+  },
+  "hmdm_devices_delete": {
+    "tier": "admin",
+    "operation": "devicesDelete"
+  },
+  "hmdm_devices_delete_bulk": {
+    "tier": "admin",
+    "operation": "devicesDeleteBulk"
+  },
+  "hmdm_configurations_delete": {
+    "tier": "admin",
+    "operation": "configurationsDelete"
+  },
+  "hmdm_applications_delete": {
+    "tier": "admin",
+    "operation": "applicationsDelete"
+  },
+  "hmdm_applications_versions_delete": {
+    "tier": "admin",
+    "operation": "applicationsVersionsDelete"
+  },
+  "hmdm_groups_delete": {
+    "tier": "admin",
+    "operation": "groupsDelete"
+  },
+  "hmdm_messaging_delete": {
+    "tier": "admin",
+    "operation": "messagingDelete"
+  },
+  "hmdm_messaging_purge": {
+    "tier": "admin",
+    "operation": "messagingPurge"
+  },
+  "hmdm_push_delete": {
+    "tier": "admin",
+    "operation": "pushDelete"
+  },
+  "hmdm_push_purge": {
+    "tier": "admin",
+    "operation": "pushPurge"
+  },
+  "hmdm_push_task_delete": {
+    "tier": "admin",
+    "operation": "pushTaskDelete"
+  },
+  "hmdm_settings_misc_update": {
+    "tier": "admin",
+    "operation": "settingsMiscUpdate"
+  }
+}

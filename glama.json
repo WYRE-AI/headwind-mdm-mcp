@@ -1,0 +1,9 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "name": "headwind-mdm-mcp",
+  "title": "Headwind MDM",
+  "description": "MCP server for the Headwind MDM REST API.",
+  "maintainers": [
+    "asachs01"
+  ]
+}
