@@ -378,6 +378,15 @@ describe("redaction", () => {
     expect(text).toContain("[REDACTED]");
   });
 
+  it("redacts a short password in successful data only on an exact match", async () => {
+    const short = { username: "test-admin", password: "admin" };
+    stubFetch((url) =>
+      url.endsWith("/login") ? loginOk("tok-short") : json({ status: "OK", data: { name: "admin-config", login: "admin" } }),
+    );
+    const result = await executeHeadwindRequest({ method: "GET", path: "/private/settings", credentials: short });
+    expect(result).toEqual({ ok: true, data: { name: "admin-config", login: "[REDACTED]" } });
+  });
+
   it("never echoes the MD5 of the password from a failed login", async () => {
     const md5 = md5Upper(credentials.password);
     stubFetch(() => json({ message: `bad login ${md5} ${md5.toLowerCase()} for ${credentials.password}` }, 401));
@@ -403,6 +412,14 @@ describe("redaction", () => {
     expect(redactData({ a: ["s3cr3t-value", { "s3cr3t-value": "x" }], n: 1 }, ["s3cr3t-value"])).toEqual({
       a: ["[REDACTED]", { "[REDACTED]": "x" }],
       n: 1,
+    });
+  });
+
+  it("redactData keeps entity fields that merely contain a short exact-only secret", () => {
+    expect(redactData({ name: "admin-config", login: "admin", t: "tok-abc" }, ["tok-abc"], ["admin"])).toEqual({
+      name: "admin-config",
+      login: "[REDACTED]",
+      t: "[REDACTED]",
     });
   });
 });

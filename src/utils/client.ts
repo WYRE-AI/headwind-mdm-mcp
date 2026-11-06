@@ -165,16 +165,32 @@ export function redactAndTruncate(text: string, secrets: string[]): string {
   return redactSecrets(text, secrets).slice(0, MAX_MESSAGE_CHARS);
 }
 
-/** Redact every string in a (JSON) value: values, array items and object keys. */
-export function redactData(data: unknown, secrets: string[]): unknown {
-  if (typeof data === "string") return redactSecrets(data, secrets);
-  if (Array.isArray(data)) return data.map((item) => redactData(item, secrets));
-  if (typeof data === "object" && data !== null) {
-    return Object.fromEntries(
-      Object.entries(data).map(([key, value]) => [redactSecrets(key, secrets), redactData(value, secrets)]),
-    );
-  }
-  return data;
+/** Below this length a plain password is too likely to collide with ordinary entity text. */
+const MIN_SUBSTRING_REDACT_CHARS = 8;
+
+/**
+ * Redact credentials from a successful (JSON) entity payload: values, array items and object keys.
+ * `secrets` are replaced as substrings; `exactSecrets` only when a whole string equals them, so
+ * ordinary entity fields that merely contain a short password survive a read-and-update round trip.
+ */
+export function redactData(data: unknown, secrets: string[], exactSecrets: string[] = []): unknown {
+  const redact = (text: string): string => {
+    if (exactSecrets.includes(text)) return "[REDACTED]";
+    let out = text;
+    for (const secret of [...secrets].filter(Boolean).sort((a, b) => b.length - a.length)) {
+      out = out.split(secret).join("[REDACTED]");
+    }
+    return out;
+  };
+  const walk = (value: unknown): unknown => {
+    if (typeof value === "string") return redact(value);
+    if (Array.isArray(value)) return value.map(walk);
+    if (typeof value === "object" && value !== null) {
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [redact(key), walk(item)]));
+    }
+    return value;
+  };
+  return walk(data);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,7 +367,10 @@ async function login(baseUrl: string, credentials: HeadwindCredentials): Promise
   const token = headerToken || bodyToken;
   if (!response.ok || !token) {
     const upstream = isRecord(body) && typeof body.message === "string" ? `: ${body.message}` : "";
-    throw new HeadwindError("auth", redactAndTruncate(`Headwind MDM authentication failed${upstream}`, [...secrets, token]));
+    throw new HeadwindError(
+      "auth",
+      redactAndTruncate(`Headwind MDM authentication failed (HTTP status ${response.status})${upstream}`, [...secrets, token]),
+    );
   }
   cacheSet(cacheKey(baseUrl, credentials), token);
   return token;
@@ -606,5 +625,13 @@ export async function executeHeadwindRequest(
   if (!isRecord(body) || body.status !== "OK") {
     return failure("http", "Headwind MDM response was missing a valid status envelope.");
   }
-  return { ok: true, data: redactData(body.data ?? null, secrets) };
+  // Error messages above redact every secret as a substring regardless of length. In entity data a
+  // short password (e.g. "admin") is redacted only on an exact match, so fields that merely contain
+  // it are returned unaltered and can be sent back in an update.
+  const [password, ...derived] = secrets;
+  const shortPassword = password.length < MIN_SUBSTRING_REDACT_CHARS;
+  return {
+    ok: true,
+    data: redactData(body.data ?? null, shortPassword ? derived : secrets, shortPassword ? [password] : []),
+  };
 }

@@ -39,7 +39,8 @@ function makeTool(endpoint: EndpointSpec): Tool {
       title: `Headwind MDM: ${endpoint.name}`,
       readOnlyHint: endpoint.tier === "read",
       destructiveHint: endpoint.destructiveHint,
-      idempotentHint: endpoint.method === "GET" || endpoint.method === "PUT" || endpoint.method === "DELETE",
+      // PUT endpoints are create-or-update (or copy) and create a new resource when id is omitted.
+      idempotentHint: endpoint.method === "GET" || endpoint.method === "DELETE",
       openWorldHint: true,
     },
   };

@@ -18,6 +18,22 @@
       },
       "environmentVariables": [
         {
+          "name": "MCP_TRANSPORT",
+          "description": "Run the image over stdio (the image default is http).",
+          "value": "stdio",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "AUTH_MODE",
+          "description": "Read Headwind MDM credentials from HMDM_USERNAME/HMDM_PASSWORD (the image default is gateway).",
+          "value": "env",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
           "name": "HMDM_BASE_URL",
           "description": "Headwind MDM server root, e.g. https://mdm.example.com (/rest is appended automatically). Required; no default.",
           "isRequired": true,
